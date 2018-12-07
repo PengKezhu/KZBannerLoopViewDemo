@@ -10,10 +10,20 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class QMTTLoopBannerView;
+@protocol QMTTLoopBannerViewDelegate <NSObject>
+
+- (UIView *)loopView:(QMTTLoopBannerView *)loopView itemForIndex:(NSInteger)index reuseId:(NSString *)reuseId;
+
+@end
+
 @interface QMTTLoopBannerView : UIView
 
-@property (nonatomic, copy) NSArray *imgs;//可以是NSData, imgUrlString, imageURL, UIImage
-@property (nonatomic, copy) NSString *placeholderImg;
+@property (nonatomic, assign) NSInteger itemsCount;//item的总数量
+
+@property (nonatomic, weak) id <QMTTLoopBannerViewDelegate> delegate;
+
+- (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier;//复用，用法类似UITableView
 
 - (void)reloadData;
 
