@@ -37,17 +37,32 @@
     self.bannerLoopView.itemsCount = self.dataSource.count;
     self.bannerLoopView.pageIndicatorTintColor = UIColor.whiteColor;
     self.bannerLoopView.currentPageIndicatorTintColor = UIColor.orangeColor;
+    self.bannerLoopView.timeInterval = 2;
     [self.bannerLoopView reloadData];
     [self.view addSubview:self.bannerLoopView];
 }
 
 - (UIView *)loopView:(QMTTLoopBannerView *)loopView itemForIndex:(NSInteger)index reuseId:(NSString *)reuseId {
-    UIImageView *item = [loopView dequeueReusableItemWithIdentifier:reuseId];
+    UILabel *item = [loopView dequeueReusableItemWithIdentifier:reuseId];
     if (!item) {
-        item = [[UIImageView alloc] init];
+        item = [[UILabel alloc] init];
+        item.backgroundColor = UIColor.grayColor;
+        item.textColor = UIColor.blackColor;
+        item.font = [UIFont boldSystemFontOfSize:40];
+        item.textAlignment = NSTextAlignmentCenter;
     }
-    item.image = [UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:self.dataSource[index]]]];
+    item.text = [NSString stringWithFormat:@"%ld", index];
+    
     return item;
+}
+
+- (void)loopView:(QMTTLoopBannerView *)loopView didSelectIndex:(NSInteger)index {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
+                                                                   message:[NSString stringWithFormat:@"第%ld个item被点击了", index]
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleCancel handler:NULL];
+    [alert addAction:cancelAction];
+    [self presentViewController:alert animated:YES completion:NULL];
 }
 
 @end

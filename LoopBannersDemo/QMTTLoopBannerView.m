@@ -7,6 +7,7 @@
 //
 
 #import "QMTTLoopBannerView.h"
+#import <objc/runtime.h>
 
 @interface UIView (LoopBannerConvenience)
 
@@ -46,6 +47,22 @@
 
 @end
 
+@interface UIGestureRecognizer (LoopBannerIdentifier)
+@property (nonatomic, copy) NSString *identifier;
+@end
+
+@implementation UIGestureRecognizer (LoopBannerIdentifier)
+
+- (void)setIdentifier:(NSString *)identifier {
+    objc_setAssociatedObject(self, @selector(setIdentifier:), identifier, OBJC_ASSOCIATION_COPY_NONATOMIC);
+}
+
+- (NSString *)identifier {
+    return objc_getAssociatedObject(self, @selector(setIdentifier:));
+}
+
+@end
+
 //广告轮播图
 //原理：scrollView放三个item，起始是[ITEM_n-1][ITEM_0][ITEM_1], 每次滑动到下一个item后，将scrollView归位到中间item，且取下一轮相邻三个数据并刷新
 
@@ -53,8 +70,12 @@
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIPageControl *pageControl;
 
+@property (nonatomic, strong) UITapGestureRecognizer *tapGesture;
+
 @property (nonatomic, strong) NSMutableDictionary *reusableItems;//复用的items，包括leftItem，midItem，rightItem
 @property (nonatomic, assign) NSInteger currentStartIndex;//最左边item对应的index
+
+@property (nonatomic, strong) NSTimer *timer;
 
 @end
 
@@ -71,6 +92,7 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     self = [super initWithFrame:frame];
     if (self) {
         [self prepare];
+        [self defaultCongiure];
     }
     return self;
 }
@@ -92,34 +114,58 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     [self addSubview:self.pageControl];
 }
 
+- (void)defaultCongiure {
+    self.isAutoLoop = YES;
+    self.pageIndicatorTintColor = UIColor.whiteColor;
+    self.currentPageIndicatorTintColor = UIColor.grayColor;
+    self.timeInterval = 3;
+}
+
+#pragma mark - public methods
+
 - (void)setItemsCount:(NSInteger)itemsCount {
     _itemsCount = itemsCount;
     _currentStartIndex = self.itemsCount - 1;
-    [self reloadData];
+}
+
+- (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier {
+    return self.reusableItems[identifier];
 }
 
 - (void)reloadData {
+    self.pageControl.numberOfPages = 0;
+    
     for (UIView *subView in self.scrollView.subviews) {
         [subView removeFromSuperview];
     }
+    
     if (!self.itemsCount) {
         return;
     }
     
     [self updatePageControl];
     
+    //重置复用元素
     [self.reusableItems removeObjectForKey:kBannerViewLeftItemReuseId];
     [self.reusableItems removeObjectForKey:kBannerViewMiddleItemReuseId];
     [self.reusableItems removeObjectForKey:kBannerViewRightItemReuseId];
 
     __kindof UIView *leftItem = [self.delegate loopView:self itemForIndex:self.itemsCount - 1 reuseId:kBannerViewLeftItemReuseId];
-    __kindof UIView *midItem = [self.delegate loopView:self itemForIndex:0 reuseId:kBannerViewLeftItemReuseId];
-    __kindof UIView *rightItem = [self.delegate loopView:self itemForIndex:(self.itemsCount == 1) ? 0 : 1 reuseId:kBannerViewLeftItemReuseId];
+    __kindof UIView *midItem = [self.delegate loopView:self itemForIndex:0 reuseId:kBannerViewMiddleItemReuseId];
+    __kindof UIView *rightItem = [self.delegate loopView:self itemForIndex:(self.itemsCount == 1) ? 0 : 1 reuseId:kBannerViewRightItemReuseId];
     
+    //添加点击事件
+    midItem.userInteractionEnabled = YES;
+    self.tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(itemDidClicked:)];
+    self.tapGesture.identifier = [NSString stringWithFormat:@"%ld", (self.currentStartIndex+1) % self.itemsCount];
+    [midItem addGestureRecognizer:self.tapGesture];
+    
+    //设置复用元素
     [self.reusableItems setObject:leftItem forKey:kBannerViewLeftItemReuseId];
     [self.reusableItems setObject:midItem forKey:kBannerViewMiddleItemReuseId];
     [self.reusableItems setObject:rightItem forKey:kBannerViewRightItemReuseId];
     
+    //layout初始化
     [self resizeItem:leftItem];
     [leftItem qm_setX:0 * BANNER_WIDTH];
     [self.scrollView addSubview:leftItem];
@@ -131,14 +177,8 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     [self resizeItem:rightItem];
     [rightItem qm_setX:2 * BANNER_WIDTH];
     [self.scrollView addSubview:rightItem];
-}
-
-- (void)resizeItem:(__kindof UIView *)item {
-    [item qm_setSize:CGSizeMake(BANNER_WIDTH, BANNER_HEIGHT)];
-}
-
-- (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier {
-    return self.reusableItems[identifier];
+    
+    [self resumeTimer];
 }
 
 #pragma mark - UIScrollViewDelegate
@@ -146,12 +186,23 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
     CGFloat offsetX = scrollView.contentOffset.x;
     if (offsetX <= 0) {
-        _currentStartIndex--;
-        [self updateScrollView];
+        self.currentStartIndex--;
+        [self resumeScrollViewOffset];
+        [self updateItemsAndPageControl];
     } else if (offsetX >= 2 * BANNER_WIDTH) {
-        _currentStartIndex++;
-        [self updateScrollView];
+        self.currentStartIndex++;
+        [self updateItemsAndPageControl];
+        [self resumeScrollViewOffset];
+        
     }
+}
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    [self stopTimer];
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    [self resumeTimer];
 }
 
 #pragma mark - private methods
@@ -167,35 +218,70 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     [self bringSubviewToFront:self.pageControl];
 }
 
-- (void)updateScrollView {
-    if (self.currentStartIndex == self.itemsCount) {
-        self.currentStartIndex = 0;
-    } else if (self.currentStartIndex == -1) {
-        self.currentStartIndex = self.itemsCount - 1;
-    } else {
-        self.currentStartIndex = _currentStartIndex;
-    }
+- (void)resumeScrollViewOffset {
     [self.scrollView setContentOffset:CGPointMake(BANNER_WIDTH, 0)];
 }
 
 - (void)setCurrentStartIndex:(NSInteger)currentStartIndex {
+    if (currentStartIndex == self.itemsCount) {//最后一个卡片再左滑还原到第一个
+        currentStartIndex = 0;
+    } else if (currentStartIndex == -1) {//第一个卡片右滑还原到最后一个
+        currentStartIndex = self.itemsCount - 1;
+    }
     _currentStartIndex = currentStartIndex;
-    NSInteger n = self.itemsCount;
-    
-    [self.delegate loopView:self itemForIndex:currentStartIndex reuseId:kBannerViewLeftItemReuseId];
-    
-    NSInteger secondItemIndex = currentStartIndex + 1;
-    if (secondItemIndex == n) {
-        secondItemIndex = 0;
-    }
-    [self.delegate loopView:self itemForIndex:secondItemIndex reuseId:kBannerViewMiddleItemReuseId];
-    self.pageControl.currentPage = secondItemIndex;
+}
 
-    NSInteger thirdItemIndex = secondItemIndex + 1;
-    if (thirdItemIndex == n) {
-        thirdItemIndex = 0;
+- (void)updateItemsAndPageControl {
+    NSAssert([self.delegate respondsToSelector:@selector(loopView:itemForIndex:reuseId:)], @"No delegate conformed!");
+    
+    [self.delegate loopView:self itemForIndex:(self.currentStartIndex + 0) % self.itemsCount reuseId:kBannerViewLeftItemReuseId];
+    [self.delegate loopView:self itemForIndex:(self.currentStartIndex + 1) % self.itemsCount reuseId:kBannerViewMiddleItemReuseId];
+    [self.delegate loopView:self itemForIndex:(self.currentStartIndex + 2) % self.itemsCount reuseId:kBannerViewRightItemReuseId];
+    
+    self.pageControl.currentPage = (self.currentStartIndex + 1) % self.itemsCount;
+    self.tapGesture.identifier = [NSString stringWithFormat:@"%ld", (self.currentStartIndex+1) % self.itemsCount];
+}
+
+- (void)resizeItem:(__kindof UIView *)item {
+    [item qm_setSize:CGSizeMake(BANNER_WIDTH, BANNER_HEIGHT)];
+}
+
+- (void)resumeTimer {
+    if (self.timer) {
+        return;
     }
-    [self.delegate loopView:self itemForIndex:thirdItemIndex reuseId:kBannerViewRightItemReuseId];
+}
+
+- (void)stopTimer {
+    [self.timer invalidate];
+    self.timer = nil;
+}
+
+- (void)scheduledLoop:(NSTimer *)timer {
+    if (self.isAutoLoop) {
+        [self.scrollView setContentOffset:CGPointMake(BANNER_WIDTH * 2, 0) animated:YES];
+    }
+}
+
+#pragma mark - Action
+
+- (void)itemDidClicked:(UITapGestureRecognizer *)gesture {
+    if ([self.delegate respondsToSelector:@selector(loopView:didSelectIndex:)]) {
+        [self.delegate loopView:self didSelectIndex:gesture.identifier.integerValue];
+    }
+}
+
+#pragma mark - getter
+
+- (NSTimer *)timer {
+    if (!_timer) {
+        _timer = [NSTimer scheduledTimerWithTimeInterval:self.timeInterval target:self selector:@selector(scheduledLoop:) userInfo:nil repeats:YES];
+    }
+    return _timer;
+}
+
+- (void)dealloc {
+    [self stopTimer];
 }
 
 @end

@@ -15,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (UIView *)loopView:(QMTTLoopBannerView *)loopView itemForIndex:(NSInteger)index reuseId:(NSString *)reuseId;
 
+@optional
+- (void)loopView:(QMTTLoopBannerView *)loopView didSelectIndex:(NSInteger)index;
+
 @end
 
 @interface QMTTLoopBannerView : UIView
@@ -22,13 +25,17 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger itemsCount;//item的总数量
 @property (nonatomic, weak) id <QMTTLoopBannerViewDelegate> delegate;
 
+@property (nonatomic, assign) NSTimeInterval timeInterval;//时间间隔，默认3秒一换
+
 //pageControl相关
 @property(nonatomic, strong) UIColor *pageIndicatorTintColor;
 @property(nonatomic, strong) UIColor *currentPageIndicatorTintColor;
 
+@property (nonatomic, assign) BOOL isAutoLoop;//是否开启自动轮播，默认开启
+
 - (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier;//复用，用法类似UITableView
 
-- (void)reloadData;//载入数据
+- (void)reloadData;//载入数据， 设置以上属性之后调用
 
 @end
 
