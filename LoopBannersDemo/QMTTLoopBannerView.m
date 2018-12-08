@@ -10,20 +10,34 @@
 
 @interface UIView (LoopBannerConvenience)
 
-- (void)setX:(CGFloat)originX;
-- (void)setSize:(CGSize)size;
+- (void)qm_setX:(CGFloat)originX;
+- (void)qm_setBottom:(CGFloat)bottom;
+- (void)qm_setCenterX:(CGFloat)centerX;
+- (void)qm_setSize:(CGSize)size;
 
 @end
 
 @implementation UIView (LoopBannerConvenience)
 
-- (void)setX:(CGFloat)originX {
+- (void)qm_setX:(CGFloat)originX {
     CGRect frame = self.frame;
     frame.origin.x = originX;
     self.frame = frame;
 }
 
-- (void)setSize:(CGSize)size {
+- (void)qm_setBottom:(CGFloat)bottom {
+    CGRect frame = self.frame;
+    frame.origin.y = bottom - CGRectGetHeight(self.frame);
+    self.frame = frame;
+}
+
+- (void)qm_setCenterX:(CGFloat)centerX {
+    CGPoint center = self.center;
+    center.x = centerX;
+    self.center = center;
+}
+
+- (void)qm_setSize:(CGSize)size {
     CGRect frame = self.frame;
     frame.size.width = size.width;
     frame.size.height = size.height;
@@ -32,11 +46,15 @@
 
 @end
 
+//广告轮播图
+//原理：scrollView放三个item，起始是[ITEM_n-1][ITEM_0][ITEM_1], 每次滑动到下一个item后，将scrollView归位到中间item，且取下一轮相邻三个数据并刷新
+
 @interface QMTTLoopBannerView ()<UIScrollViewDelegate>
 @property (nonatomic, strong) UIScrollView *scrollView;
+@property (nonatomic, strong) UIPageControl *pageControl;
 
-@property (nonatomic, strong) NSMutableDictionary *reusableItems;
-@property (nonatomic, assign) NSInteger currentStartIndex;//最左边item对应的数组index
+@property (nonatomic, strong) NSMutableDictionary *reusableItems;//复用的items，包括leftItem，midItem，rightItem
+@property (nonatomic, assign) NSInteger currentStartIndex;//最左边item对应的index
 
 @end
 
@@ -58,6 +76,8 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
 }
 
 - (void)prepare {
+    self.reusableItems = [NSMutableDictionary dictionary];
+    
     self.scrollView = [[UIScrollView alloc] initWithFrame:self.bounds];
     self.scrollView.delegate = self;
     self.scrollView.contentSize = CGSizeMake(BANNER_WIDTH * 3, BANNER_HEIGHT);
@@ -66,7 +86,10 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     [self.scrollView setContentOffset:CGPointMake(BANNER_WIDTH, 0)];
     [self addSubview:self.scrollView];
     
-    self.reusableItems = [NSMutableDictionary dictionary];
+    self.pageControl = [[UIPageControl alloc] init];
+    self.pageControl.hidesForSinglePage = YES;
+    self.pageControl.defersCurrentPageDisplay = YES;
+    [self addSubview:self.pageControl];
 }
 
 - (void)setItemsCount:(NSInteger)itemsCount {
@@ -83,13 +106,12 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
         return;
     }
     
+    [self updatePageControl];
+    
     [self.reusableItems removeObjectForKey:kBannerViewLeftItemReuseId];
     [self.reusableItems removeObjectForKey:kBannerViewMiddleItemReuseId];
     [self.reusableItems removeObjectForKey:kBannerViewRightItemReuseId];
 
-    if (self.itemsCount == 1) {
-        
-    }
     __kindof UIView *leftItem = [self.delegate loopView:self itemForIndex:self.itemsCount - 1 reuseId:kBannerViewLeftItemReuseId];
     __kindof UIView *midItem = [self.delegate loopView:self itemForIndex:0 reuseId:kBannerViewLeftItemReuseId];
     __kindof UIView *rightItem = [self.delegate loopView:self itemForIndex:(self.itemsCount == 1) ? 0 : 1 reuseId:kBannerViewLeftItemReuseId];
@@ -99,25 +121,27 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
     [self.reusableItems setObject:rightItem forKey:kBannerViewRightItemReuseId];
     
     [self resizeItem:leftItem];
-    [leftItem setX:0 * BANNER_WIDTH];
+    [leftItem qm_setX:0 * BANNER_WIDTH];
     [self.scrollView addSubview:leftItem];
     
     [self resizeItem:midItem];
-    [midItem setX:1 * BANNER_WIDTH];
+    [midItem qm_setX:1 * BANNER_WIDTH];
     [self.scrollView addSubview:midItem];
     
     [self resizeItem:rightItem];
-    [rightItem setX:2 * BANNER_WIDTH];
+    [rightItem qm_setX:2 * BANNER_WIDTH];
     [self.scrollView addSubview:rightItem];
 }
 
 - (void)resizeItem:(__kindof UIView *)item {
-    [item setSize:CGSizeMake(BANNER_WIDTH, BANNER_HEIGHT)];
+    [item qm_setSize:CGSizeMake(BANNER_WIDTH, BANNER_HEIGHT)];
 }
 
 - (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier {
     return self.reusableItems[identifier];
 }
+
+#pragma mark - UIScrollViewDelegate
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
     CGFloat offsetX = scrollView.contentOffset.x;
@@ -128,6 +152,19 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
         _currentStartIndex++;
         [self updateScrollView];
     }
+}
+
+#pragma mark - private methods
+
+- (void)updatePageControl {
+    self.pageControl.numberOfPages = self.itemsCount;
+    self.pageControl.currentPage = 0;
+    self.pageControl.pageIndicatorTintColor = self.pageIndicatorTintColor;
+    self.pageControl.currentPageIndicatorTintColor = self.currentPageIndicatorTintColor;
+    [self.pageControl qm_setSize:CGSizeMake(self.itemsCount * 8.f, 8.f)];
+    [self.pageControl qm_setCenterX:self.frame.size.width / 2.f];
+    [self.pageControl qm_setBottom:CGRectGetHeight(self.frame) - 10.f];
+    [self bringSubviewToFront:self.pageControl];
 }
 
 - (void)updateScrollView {
@@ -152,6 +189,7 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
         secondItemIndex = 0;
     }
     [self.delegate loopView:self itemForIndex:secondItemIndex reuseId:kBannerViewMiddleItemReuseId];
+    self.pageControl.currentPage = secondItemIndex;
 
     NSInteger thirdItemIndex = secondItemIndex + 1;
     if (thirdItemIndex == n) {

@@ -20,12 +20,15 @@ NS_ASSUME_NONNULL_BEGIN
 @interface QMTTLoopBannerView : UIView
 
 @property (nonatomic, assign) NSInteger itemsCount;//item的总数量
-
 @property (nonatomic, weak) id <QMTTLoopBannerViewDelegate> delegate;
+
+//pageControl相关
+@property(nonatomic, strong) UIColor *pageIndicatorTintColor;
+@property(nonatomic, strong) UIColor *currentPageIndicatorTintColor;
 
 - (__kindof UIView *)dequeueReusableItemWithIdentifier:(NSString *)identifier;//复用，用法类似UITableView
 
-- (void)reloadData;
+- (void)reloadData;//载入数据
 
 @end
 
