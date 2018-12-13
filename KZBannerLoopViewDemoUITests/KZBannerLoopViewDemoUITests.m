@@ -1,18 +1,18 @@
 //
-//  LoopBannersDemoUITests.m
-//  LoopBannersDemoUITests
+//  KZBannerLoopViewDemoUITests.m
+//  KZBannerLoopViewDemoUITests
 //
-//  Created by 彭柯柱 on 2018/12/6.
-//  Copyright © 2018 彭柯柱. All rights reserved.
+//  Created by pengkezhu on 2018/12/13.
+//  Copyright © 2018 Kevin. All rights reserved.
 //
 
 #import <XCTest/XCTest.h>
 
-@interface LoopBannersDemoUITests : XCTestCase
+@interface KZBannerLoopViewDemoUITests : XCTestCase
 
 @end
 
-@implementation LoopBannersDemoUITests
+@implementation KZBannerLoopViewDemoUITests
 
 - (void)setUp {
     // Put setup code here. This method is called before the invocation of each test method in the class.

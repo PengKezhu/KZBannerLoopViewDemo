@@ -1,5 +1,5 @@
 //
-//  QMTTLoopBannerView.h
+//  KZBannerLoopView.h
 //  LoopBannersDemo
 //
 //  Created by pengkezhu on 2018/12/7.
@@ -10,26 +10,27 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class QMTTLoopBannerView;
-@protocol QMTTLoopBannerViewDelegate <NSObject>
+@class KZBannerLoopView;
+@protocol KZBannerLoopViewDelegate <NSObject>
 
-- (UIView *)loopView:(QMTTLoopBannerView *)loopView itemForIndex:(NSInteger)index reuseId:(NSString *)reuseId;
+- (UIView *)loopView:(KZBannerLoopView *)loopView itemForIndex:(NSInteger)index reuseId:(NSString *)reuseId;
 
 @optional
-- (void)loopView:(QMTTLoopBannerView *)loopView didSelectIndex:(NSInteger)index;
+- (void)loopView:(KZBannerLoopView *)loopView didSelectIndex:(NSInteger)index;
 
 @end
 
-@interface QMTTLoopBannerView : UIView
+@interface KZBannerLoopView : UIView
 
 @property (nonatomic, assign) NSInteger itemsCount;//item的总数量
-@property (nonatomic, weak) id <QMTTLoopBannerViewDelegate> delegate;
+@property (nonatomic, weak) id <KZBannerLoopViewDelegate> delegate;
 
 @property (nonatomic, assign) NSTimeInterval timeInterval;//时间间隔，默认3秒一换
 
 //pageControl相关
-@property(nonatomic, strong) UIColor *pageIndicatorTintColor;
-@property(nonatomic, strong) UIColor *currentPageIndicatorTintColor;
+@property (nonatomic, strong) UIColor *pageIndicatorTintColor;
+@property (nonatomic, strong) UIColor *currentPageIndicatorTintColor;
+@property (nonatomic, assign) CGFloat edgeInsetBottom;      //底边距
 
 @property (nonatomic, assign) BOOL isAutoLoop;//是否开启自动轮播，默认开启
 
