@@ -1,1 +1,1 @@
-# LoopBannerDemo
+# BannerLoopDemo
