@@ -142,7 +142,6 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
         self.currentStartIndex++;
         [self updateItemsAndPageControl];
         [self resumeScrollViewOffset];
-        
     }
 }
 
@@ -182,6 +181,9 @@ NSString *const kBannerViewRightItemReuseId  = @"kBannerViewRightItemReuseId";
 
 - (void)updateItemsAndPageControl {
     NSAssert([self.delegate respondsToSelector:@selector(loopView:itemForIndex:reuseId:)], @"No delegate conformed!");
+    if (!self.itemsCount) {
+        return;
+    }
     
     [self.delegate loopView:self itemForIndex:(self.currentStartIndex + 0) % self.itemsCount reuseId:kBannerViewLeftItemReuseId];
     [self.delegate loopView:self itemForIndex:(self.currentStartIndex + 1) % self.itemsCount reuseId:kBannerViewMiddleItemReuseId];
